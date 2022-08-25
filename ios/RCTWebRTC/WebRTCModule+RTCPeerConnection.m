@@ -151,9 +151,11 @@ RCT_EXPORT_METHOD(peerConnectionCreateOffer:(nonnull NSNumber *)objectID
           ]);
         } else {
           NSString *type = [RTCSessionDescription stringForType:sdp.type];
-          callback(@[@(YES), @{@"sdp": sdp.sdp,
-                               @"type": type,
-                               @"sdpInfo": @{},
+          callback(@[@(YES), @{
+                               @"sdpInfo": @{
+                                 @"sdp": sdp.sdp,
+                                 @"type": type
+                               },
                                @"transceiversInfo": [SerializeUtils constructTransceiversInfoArrayWithPeerConnection:peerConnection peerConnectionId: objectID]
           }]);
         }
@@ -186,9 +188,9 @@ RCT_EXPORT_METHOD(peerConnectionCreateAnswer:(nonnull NSNumber *)objectID
            ]);
          } else {
            NSString *type = [RTCSessionDescription stringForType:sdp.type];
-           callback(@[@(YES), @{@"sdp": sdp.sdp,
-                                @"type": type,
-                                @"sdpInfo": @{},
+           callback(@[@(YES), @{
+                                @"sdpInfo": @{@"sdp": sdp.sdp,
+                                              @"type": type},
                                 @"transceiversInfo": [SerializeUtils constructTransceiversInfoArrayWithPeerConnection:peerConnection peerConnectionId: objectID]
            }]);
          }
@@ -209,18 +211,21 @@ RCT_EXPORT_METHOD(peerConnectionSetLocalDescription:(nonnull NSNumber *)objectID
   __weak RTCPeerConnection *weakPc = peerConnection;
 
   RTCSetSessionDescriptionCompletionHandler handler = ^(NSError *error) {
+    dispatch_async(self.workerQueue, ^{
       if (error) {
           reject(@"E_OPERATION_ERROR", error.localizedDescription, nil);
       } else {
         RTCPeerConnection *strongPc = weakPc;
         id newSdp = @{
-            @"type": [RTCSessionDescription stringForType:strongPc.localDescription.type],
-            @"sdp": strongPc.localDescription.sdp,
-            @"sdpInfo": @{},
+
+            @"sdpInfo": @{@"type": [RTCSessionDescription stringForType:strongPc.localDescription.type],
+                          @"sdp": strongPc.localDescription.sdp
+            },
             @"transceiversInfo": [SerializeUtils constructTransceiversInfoArrayWithPeerConnection:peerConnection peerConnectionId: objectID]
         };
         resolve(newSdp);
       }
+    });
   };
 
   if (desc == nil) {
@@ -238,21 +243,23 @@ RCT_EXPORT_METHOD(peerConnectionSetRemoteDescription:(RTCSessionDescription *)sd
   }
 
   [peerConnection setRemoteDescription: sdp completionHandler: ^(NSError *error) {
-    if (error) {
-      id errorResponse = @{
-        @"name": @"SetRemoteDescriptionFailed",
-        @"message": error.localizedDescription ?: [NSNull null]
-      };
-      callback(@[@(NO), errorResponse]);
-    } else {
-      id newSdp = @{
-          @"type": [RTCSessionDescription stringForType:peerConnection.remoteDescription.type],
-          @"sdp": peerConnection.remoteDescription.sdp,
-          @"sdpInfo": @{},
-          @"transceiversInfo": [SerializeUtils constructTransceiversInfoArrayWithPeerConnection:peerConnection peerConnectionId: objectID]
-      };
-      callback(@[@(YES), newSdp]);
-    }
+    dispatch_async(self.workerQueue, ^{
+      if (error) {
+        id errorResponse = @{
+          @"name": @"SetRemoteDescriptionFailed",
+          @"message": error.localizedDescription ?: [NSNull null]
+        };
+        callback(@[@(NO), errorResponse]);
+      } else {
+        id newSdp = @{
+            @"sdpInfo": @{
+                          @"type": [RTCSessionDescription stringForType:peerConnection.remoteDescription.type],
+                          @"sdp": peerConnection.remoteDescription.sdp},
+            @"transceiversInfo": [SerializeUtils constructTransceiversInfoArrayWithPeerConnection:peerConnection peerConnectionId: objectID]
+        };
+        callback(@[@(YES), newSdp]);
+      }
+    });
   }];
 }
 
@@ -451,7 +458,6 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionAddTransceiver:(nonnull NSN
 RCT_EXPORT_METHOD(peerConnectionRemoveTrack:(nonnull NSNumber *)objectID
                                    senderId:(nonnull NSString *)senderId)
 {
-    dispatch_sync(self.workerQueue, ^{
         RTCPeerConnection *peerConnection = self.peerConnections[objectID];
         if (!peerConnection) {
           RCTLogWarn(@"PeerConnection %@ not found", objectID);
@@ -484,8 +490,6 @@ RCT_EXPORT_METHOD(peerConnectionRemoveTrack:(nonnull NSNumber *)objectID
                                  message: @"Cannot remove track"
                                     info: identifier];
         }
-
-    });
 }
 
 // TODO: move these below to some SerializeUrils file
@@ -741,7 +745,7 @@ RCT_EXPORT_METHOD(peerConnectionRemoveTrack:(nonnull NSNumber *)objectID
 }
 
 - (void)peerConnection:(RTCPeerConnection *)peerConnection didStartReceivingOnTransceiver:(RTCRtpTransceiver *)transceiver                                                                                                    streams:(NSArray<RTCMediaStream *> *)mediaStreams {
-    dispatch_sync(self.workerQueue, ^{
+    dispatch_async(self.workerQueue, ^{
         RTCRtpReceiver *receiver = transceiver.receiver;
         RTCMediaStreamTrack *track = receiver.track;
         
@@ -774,7 +778,7 @@ RCT_EXPORT_METHOD(peerConnectionRemoveTrack:(nonnull NSNumber *)objectID
             
             if (!streamReactTag) {
                 NSUUID *uuid = [NSUUID UUID];
-                NSString *streamReactTag = [uuid UUIDString];
+                streamReactTag = [uuid UUIDString];
                 peerConnection.remoteStreams[streamReactTag] = stream;
             }
             

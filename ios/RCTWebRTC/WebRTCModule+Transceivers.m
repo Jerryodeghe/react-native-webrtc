@@ -57,7 +57,6 @@ RCT_EXPORT_METHOD(senderReplaceTrack:(nonnull NSNumber *) objectID
                             resolver:(RCTPromiseResolveBlock)resolve
                             rejecter:(RCTPromiseRejectBlock)reject)
 {
-    dispatch_sync(self.workerQueue, ^{
         RTCPeerConnection *peerConnection = self.peerConnections[objectID];
 
         if (peerConnection == nil) {
@@ -82,7 +81,6 @@ RCT_EXPORT_METHOD(senderReplaceTrack:(nonnull NSNumber *) objectID
         RTCMediaStreamTrack *track = self.localTracks[trackId];
         [sender setTrack:track];
         resolve(@true);
-    });
 }
 
 RCT_EXPORT_METHOD(senderSetParameters:(nonnull NSNumber *) objectID
@@ -91,7 +89,6 @@ RCT_EXPORT_METHOD(senderSetParameters:(nonnull NSNumber *) objectID
                             resolver:(RCTPromiseResolveBlock)resolve
                             rejecter:(RCTPromiseRejectBlock)reject)
 {
-    dispatch_sync(self.workerQueue, ^{
         RTCPeerConnection *peerConnection = self.peerConnections[objectID];
 
         if (peerConnection == nil) {
@@ -115,14 +112,12 @@ RCT_EXPORT_METHOD(senderSetParameters:(nonnull NSNumber *) objectID
         RTCRtpSender *sender = transceiver.sender;
         RTCRtpParameters *parameters = sender.parameters;
         [sender setParameters:[self updateParametersWithOptions: options params: parameters]];
-    });
 }
 
 RCT_EXPORT_METHOD(transceiverSetDirection:(nonnull NSNumber *) objectID
                             senderId:(NSString *)senderId
                             direction:(NSString *)direction)
 {
-    dispatch_sync(self.workerQueue, ^{
         RTCPeerConnection *peerConnection = self.peerConnections[objectID];
 
         if (peerConnection == nil) {
@@ -153,13 +148,11 @@ RCT_EXPORT_METHOD(transceiverSetDirection:(nonnull NSNumber *) objectID
         [transceiver setDirection:[SerializeUtils parseDirection:direction] error: nil];
         
         // TODO add error handling
-    });
 }
 
 RCT_EXPORT_METHOD(transceiverStop:(nonnull NSNumber *) objectID
                             senderId:(NSString *)senderId)
 {
-     dispatch_sync(self.workerQueue, ^{
         RTCPeerConnection *peerConnection = self.peerConnections[objectID];
 
         if (peerConnection == nil) {
@@ -186,7 +179,6 @@ RCT_EXPORT_METHOD(transceiverStop:(nonnull NSNumber *) objectID
                                 @"peerConnectionId": objectID,
                                 @"transceiverId": senderId
                               }];
-    });
 }
 
 - (RTCRtpParameters *) updateParametersWithOptions: (NSDictionary *) options
